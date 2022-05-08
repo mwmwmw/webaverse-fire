@@ -1,9 +1,8 @@
+import * as THREE from 'three';
 import metaversefile from 'metaversefile';
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
 const { useApp, useFrame } = metaversefile;
-
-import * as THREE from 'three';
 
 const vertexShader = `
 precision mediump float;
@@ -54,7 +53,7 @@ float spread = 0.2;
 }
 `;
 
-export default class Fire extends THREE.Object3D {
+class Fire extends THREE.Object3D {
   constructor({
     density = 30, 
     height = 5, 
