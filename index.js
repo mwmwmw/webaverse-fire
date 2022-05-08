@@ -2,9 +2,12 @@ import * as THREE from 'three';
 import metaversefile from 'metaversefile';
 
 const baseUrl = import.meta.url.replace(/(\/)[^\/\\]*$/, '$1');
-const { useApp, useFrame } = metaversefile;
+const {useApp, useFrame} = metaversefile;
 
 const vertexShader = `
+${THREE.ShaderChunk.common}
+${THREE.ShaderChunk.logdepthbuf_pars_vertex}
+
 precision mediump float;
 precision mediump int;
 attribute vec4 color;
@@ -21,14 +24,16 @@ void main() {
     mat4 model = instanceMatrix;
     vUv = ((uv + model[3].xy -1.) * 1.4) / height;
     dissolve = texture2D(blendPattern, vUv/height).r;
-    vec4 localPosition = vec4( dissolve*0.1+position, 1) ;
+    vec4 localPosition = vec4( dissolve*0.1+position, 1);
     
     vFade = clamp((position.y + 3.0) / 6.0, 0.0, 1.0);
     gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * localPosition;
+    ${THREE.ShaderChunk.logdepthbuf_vertex}
 }
 `;
 
 const fragmentShader = `
+${THREE.ShaderChunk.logdepthbuf_pars_fragment}
 precision mediump float;
 precision mediump int;
 
@@ -50,17 +55,18 @@ float spread = 0.2;
         blend + dissolve*1.2
     );
     gl_FragColor = texture2D(gradient, vUv*fadeAmount);
+    ${THREE.ShaderChunk.logdepthbuf_fragment}
 }
 `;
 
 class Fire extends THREE.Object3D {
   constructor({
-    density = 30, 
-    height = 5, 
-    r = 1, 
+    density = 30,
+    height = 5,
+    r = 1,
     resolution = 2,
-    dissolveImage = 'https://mwmwmw.github.io/files/Textures/Tendrils.png',
-    fireImage = 'https://mwmwmw.github.io/files/Textures/Fire2.png',
+    dissolveImage = `${baseUrl}/textures/fire.png`,
+    fireImage = `${baseUrl}/textures/dissolve.png`,
   }) {
     super();
     this.height = height;
@@ -104,9 +110,12 @@ class Fire extends THREE.Object3D {
       },
       vertexShader,
       fragmentShader,
+      side: THREE.DoubleSide,
       transparent: true,
-      // side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
+      depthWrite: true,
+      clipping: false,
+      fog: false,
+      lights: false,
     });
 
     this.light = new THREE.PointLight(0xff5500, 1, 100);
@@ -153,7 +162,7 @@ class Fire extends THREE.Object3D {
       this.mesh.setMatrixAt(i, this.iMatrix);
     }
 
-    this.mesh.position.y -= 0.75;
+    this.mesh.position.y -= 0.50;
     this.add(this.mesh);
   }
 
@@ -177,29 +186,25 @@ class Fire extends THREE.Object3D {
       const ball = this.instanceData[i];
       this.mesh.getMatrixAt(i, this.iMatrix);
       this.iMatrix.decompose(this.iPosition, this.iRotation, this.iScale);
-
       this.iPosition.x = Math.sin(this.iPosition.y * 0.5) * ball.dirX;
       this.iPosition.y += ball.dirY + Math.sin(this.iPosition.y * 0.002);
       this.iPosition.z = Math.cos(this.iPosition.y * 0.25) * ball.dirZ;
-      // return;
-      this.iScale.x = this.iScale.y = this.iScale.z =
-				ball.s +
-				Math.pow(Math.max(0.2, Math.max(1, this.iPosition.y) / this.height), 2);
+      this.iScale.x =
+        this.iScale.y =
+        this.iScale.z =
+        ball.s + Math.pow(this.iPosition.y / this.height, 2);
 
       if (this.iPosition.y > this.height) {
         this.iPosition.y = 0;
         this.iScale.x = this.iScale.y = this.iScale.z = 0.1;
         this.instanceData[i] = this.randomInstanceData();
       }
-
-      // return;
       this.iRotation.normalize();
       this.iRotation.multiply(ball.r);
 
       this.iMatrix.compose(this.iPosition, this.iRotation, this.iScale);
       this.mesh.setMatrixAt(i, this.iMatrix);
     }
-    // console.log(this.iMatrix);
     this.mesh.instanceMatrix.needsUpdate = true;
 
     this.light.intensity += (this.lightIntensity - this.light.intensity) * 0.02;
@@ -208,23 +213,15 @@ class Fire extends THREE.Object3D {
       this.lightIntensity = Math.random() * 5;
     }
   }
-
-  env(val, envelope = [0, 0, 0.1, 1, 1, 0]) {
-    function lerp(v0, v1, t) {
-      return v0 * (1 - t) + v1 * t;
-    }
-  }
 }
-
-
 
 export default () => {
   const app = useApp();
 
   const fire = new Fire({
-    density: 100,
+    density: 50,
     fireImage: `${baseUrl}/textures/fire.png`,
-    dissolveImage: `${baseUrl}/textures/dissolve.png`
+    dissolveImage: `${baseUrl}/textures/dissolve.png`,
   });
 
   useFrame(() => {
