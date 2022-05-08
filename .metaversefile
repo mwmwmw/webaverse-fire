@@ -1,0 +1,5 @@
+{
+  "name": "Fire",
+  "description": "It burns",
+  "start_url": "index.js"
+}
